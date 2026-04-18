@@ -1,0 +1,8 @@
+build*/
+output/
+Testing/
+.DS_Store
+*.o
+*.a
+.vscode/
+.cache/
