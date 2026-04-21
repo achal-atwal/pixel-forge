@@ -18,6 +18,7 @@
 #endif
 
 #include <iostream>
+#include <fstream>
 #include <filesystem>
 #include <string>
 #include <algorithm>
@@ -30,6 +31,7 @@ static void usage(const char* prog) {
         << "  --filter <name>       Run one filter only (default: all)\n"
         << "  --output-dir <path>   Output directory (default: ./output)\n"
         << "  --baseline <backend>  Speedup reference (default: cpu_single)\n"
+        << "  --csv <file>          Export benchmark results to CSV file\n"
         << "  --list-filters        Print filter names and exit\n"
         << "  --list-backends       Print backend names and exit\n";
 }
@@ -55,13 +57,14 @@ int main(int argc, char** argv) {
 #endif
 
     // Parse arguments
-    std::string input_path, filter_name, output_dir = "output", baseline = "cpu_single";
+    std::string input_path, filter_name, output_dir = "output", baseline = "cpu_single", csv_path;
 
     for (int i = 1; i < argc; i++) {
         std::string arg = argv[i];
         if (arg == "--filter" && i + 1 < argc) { filter_name = argv[++i]; }
         else if (arg == "--output-dir" && i + 1 < argc) { output_dir = argv[++i]; }
         else if (arg == "--baseline" && i + 1 < argc) { baseline = argv[++i]; }
+        else if (arg == "--csv" && i + 1 < argc) { csv_path = argv[++i]; }
         else if (arg == "--list-filters") {
             for (auto& n : filters.names()) std::cout << n << "\n";
             return 0;
@@ -132,5 +135,16 @@ int main(int argc, char** argv) {
     }
 
     bench.print(std::cout, baseline);
+
+    if (!csv_path.empty()) {
+        std::ofstream csv_file(csv_path);
+        if (!csv_file) {
+            std::cerr << "Error: could not open CSV file: " << csv_path << "\n";
+            return 1;
+        }
+        bench.to_csv(csv_file, baseline);
+        std::cout << "Benchmark CSV written to: " << csv_path << "\n";
+    }
+
     return 0;
 }

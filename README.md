@@ -10,6 +10,7 @@ The project is designed to demonstrate the real-world performance difference bet
 
 - [How It Works](#how-it-works)
 - [Architecture](#architecture)
+- [Project Structure](#project-structure)
 - [Image Formats and Color Model](#image-formats-and-color-model)
 - [Filters](#filters)
 - [Backends](#backends)
@@ -18,7 +19,6 @@ The project is designed to demonstrate the real-world performance difference bet
   - [Visual Studio](#building-with-visual-studio)
 - [Usage](#usage)
 - [Example Output](#example-output)
-- [Project Structure](#project-structure)
 - [Adding a New Filter](#adding-a-new-filter)
 - [Adding a New Backend](#adding-a-new-backend)
 - [Dependencies](#dependencies)
@@ -118,7 +118,12 @@ Both `FilterRegistry` and `BackendRegistry` preserve insertion order (important 
 
 ### Benchmark
 
-`Benchmark` collects `BenchmarkResult` values and prints a formatted table on request. Speedup is computed as `baseline_elapsed / this_elapsed`. The baseline defaults to `cpu_single` and is configurable with `--baseline`.
+`Benchmark` collects `BenchmarkResult` values and provides two output methods:
+
+- `print(os, baseline)` — formatted table with speedup columns, written to any `std::ostream`
+- `to_csv(os, baseline)` — CSV with columns `filter_name,backend_name,elapsed_ms,speedup`, written to any `std::ostream`
+
+Speedup is computed as `baseline_elapsed / this_elapsed`. The baseline defaults to `cpu_single` and is configurable with `--baseline`.
 
 ---
 
@@ -332,6 +337,7 @@ run(filter, input)
 ```
 
 - **Thread count:** Controlled by the `OMP_NUM_THREADS` environment variable. Defaults to the number of logical CPU cores reported by the OS.
+
   ```bash
   OMP_NUM_THREADS=4 ./build/pixel_forge photo.jpg
   ```
@@ -475,20 +481,14 @@ run(filter, input)
 Requirements: CMake 3.20+, a C++17 compiler.
 
 **macOS ARM (Metal — automatic):**
+
 ```bash
 cmake -B build -DCMAKE_BUILD_TYPE=Release
 cmake --build build --parallel
 ```
 
-**Windows NVIDIA (CUDA):**
- 
-Powershell:
-```bash
-cmake -B build -DCMAKE_CUDA_COMPILER="$(Get-Command nvcc | Select-Object -ExpandProperty Source)" -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE="$PWD/build"
-cmake --build build --config Release -j --parallel
-```
+**Windows (NVIDIA — automatic):**
 
-**Windows CPU-only (no CUDA):**
 ```bash
 cmake -B build -DCMAKE_RUNTIME_OUTPUT_DIRECTORY_RELEASE="$PWD/build"
 cmake --build build --config Release -j --parallel
@@ -502,6 +502,7 @@ CMake auto-detects the platform:
 OpenMP is detected automatically by `find_package(OpenMP)`. If not found, `cpu_multi` falls back to calling `filter.apply()` sequentially.
 
 **Run tests:**
+
 ```bash
 ./build/tests
 ```
@@ -565,11 +566,13 @@ Options:
   --filter <name>       Run one filter only (default: all)
   --output-dir <path>   Save output images here (default: ./output)
   --baseline <backend>  Speedup reference (default: cpu_single)
+  --csv <file>          Export benchmark results to a CSV file
   --list-filters        Print available filter names and exit
   --list-backends       Print available backend names and exit
 ```
 
 **List filters:**
+
 ```bash
 ./build/pixel_forge --list-filters
 # grayscale
@@ -581,6 +584,7 @@ Options:
 ```
 
 **List backends:**
+
 ```bash
 ./build/pixel_forge --list-backends
 # cpu_single
@@ -590,56 +594,26 @@ Options:
 ```
 
 **Run all filters on an image:**
+
 ```bash
 ./build/pixel_forge photo.jpg --output-dir ./out
 ```
 
 **Run one filter, compare speedup against cpu_multi:**
+
 ```bash
 ./build/pixel_forge photo.jpg --filter bilateral_filter --baseline cpu_multi
 ```
 
+**Export benchmark results to CSV:**
+
+```bash
+./build/pixel_forge photo.jpg --csv results.csv
+```
+
+The CSV contains one row per filter/backend combination with columns `filter_name,backend_name,elapsed_ms,speedup`.
+
 Output images are named `<stem>_<filter>_<backend>.png`, e.g. `photo_grayscale_metal.png`.
-
----
-
-## Example Output
-
-```
-Loaded: photo.jpg (1920x1080)
-  grayscale / cpu_single ... 12.3 ms  →  output/photo_grayscale_cpu_single.png
-  grayscale / cpu_multi  ...  3.1 ms  →  output/photo_grayscale_cpu_multi.png
-  grayscale / metal      ...  0.8 ms  →  output/photo_grayscale_metal.png
-  bilateral_filter / cpu_single ... 312.4 ms  →  ...
-  bilateral_filter / cpu_multi  ...  84.2 ms  →  ...
-  bilateral_filter / metal      ...   6.1 ms  →  ...
-
-Filter                  Backend              Time (ms)   Speedup
-----------------------------------------------------------------
-grayscale               cpu_single             12.3 ms      1.0x
-grayscale               cpu_multi               3.1 ms      3.9x
-grayscale               metal                   0.8 ms     15.4x
-
-gaussian_blur           cpu_single             18.7 ms      1.0x
-gaussian_blur           cpu_multi               5.2 ms      3.6x
-gaussian_blur           metal                   1.1 ms     17.0x
-
-sobel_edge              cpu_single             24.5 ms      1.0x
-sobel_edge              cpu_multi               6.3 ms      3.9x
-sobel_edge              metal                   1.4 ms     17.5x
-
-bilateral_filter        cpu_single            312.4 ms      1.0x
-bilateral_filter        cpu_multi              84.2 ms      3.7x
-bilateral_filter        metal                   6.1 ms     51.2x
-
-histogram_eq            cpu_single             15.1 ms      1.0x
-histogram_eq            cpu_multi               5.8 ms      2.6x
-histogram_eq            metal                   2.3 ms      6.6x
-
-kuwahara                cpu_single            428.7 ms      1.0x
-kuwahara                cpu_multi             112.3 ms      3.8x
-kuwahara                metal                   5.9 ms     72.7x
-```
 
 ---
 
@@ -683,6 +657,46 @@ pixel-forge/
     ├── test_backends.cpp                Backend unit tests (CPU backends)
     ├── test_registries.cpp              Registry unit tests
     └── test_integration.cpp             End-to-end pipeline tests
+```
+
+---
+
+## Example Output
+
+```
+Loaded: photo.jpg (1920x1080)
+  grayscale / cpu_single ... 12.3 ms  →  output/photo_grayscale_cpu_single.png
+  grayscale / cpu_multi  ...  3.1 ms  →  output/photo_grayscale_cpu_multi.png
+  grayscale / metal      ...  0.8 ms  →  output/photo_grayscale_metal.png
+  bilateral_filter / cpu_single ... 312.4 ms  →  ...
+  bilateral_filter / cpu_multi  ...  84.2 ms  →  ...
+  bilateral_filter / metal      ...   6.1 ms  →  ...
+
+Filter                  Backend              Time (ms)   Speedup
+----------------------------------------------------------------
+grayscale               cpu_single             12.3 ms      1.0x
+grayscale               cpu_multi               3.1 ms      3.9x
+grayscale               metal                   0.8 ms     15.4x
+
+gaussian_blur           cpu_single             18.7 ms      1.0x
+gaussian_blur           cpu_multi               5.2 ms      3.6x
+gaussian_blur           metal                   1.1 ms     17.0x
+
+sobel_edge              cpu_single             24.5 ms      1.0x
+sobel_edge              cpu_multi               6.3 ms      3.9x
+sobel_edge              metal                   1.4 ms     17.5x
+
+bilateral_filter        cpu_single            312.4 ms      1.0x
+bilateral_filter        cpu_multi              84.2 ms      3.7x
+bilateral_filter        metal                   6.1 ms     51.2x
+
+histogram_eq            cpu_single             15.1 ms      1.0x
+histogram_eq            cpu_multi               5.8 ms      2.6x
+histogram_eq            metal                   2.3 ms      6.6x
+
+kuwahara                cpu_single            428.7 ms      1.0x
+kuwahara                cpu_multi             112.3 ms      3.8x
+kuwahara                metal                   5.9 ms     72.7x
 ```
 
 ---
@@ -750,7 +764,7 @@ No other runtime dependencies. The project builds with a standard C++17 compiler
 
 ### Planned features
 
-- **GUI** — a simple native window showing before/after comparison (deferred; CLI-first for now)
+- **GUI** — a simple native window showing before/after comparison with benchmarks
 - **Batch mode** — process a directory of images
 - **Streaming / tiled processing** — for images larger than GPU memory
 - **JSON benchmark output** — `--output-format json` for scripted comparisons

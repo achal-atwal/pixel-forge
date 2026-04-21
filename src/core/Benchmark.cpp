@@ -39,3 +39,20 @@ void Benchmark::print(std::ostream& os, const std::string& baseline) const {
     }
     os << "\n";
 }
+
+void Benchmark::to_csv(std::ostream& os, const std::string& baseline) const {
+    std::map<std::string, float> base_ms;
+    for (auto& r : results_)
+        if (r.backend_name == baseline)
+            base_ms[r.filter_name] = r.elapsed_ms;
+
+    os << "filter_name,backend_name,elapsed_ms,speedup\n";
+    for (auto& r : results_) {
+        float base = base_ms.count(r.filter_name) ? base_ms.at(r.filter_name) : r.elapsed_ms;
+        float speedup = (r.elapsed_ms > 0) ? (base / r.elapsed_ms) : 0.f;
+        os << r.filter_name << ","
+            << r.backend_name << ","
+            << std::fixed << std::setprecision(2) << r.elapsed_ms << ","
+            << std::setprecision(4) << speedup << "\n";
+    }
+}
